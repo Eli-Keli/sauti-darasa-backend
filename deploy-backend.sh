@@ -40,7 +40,7 @@ gcloud run deploy $SERVICE_NAME \
   --max-instances 10 \
   --min-instances 0 \
   --service-account $SERVICE_ACCOUNT \
-  --set-env-vars "GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,FIREBASE_DATABASE_URL=https://sautidarasa.firebaseio.com,FIREBASE_PROJECT_ID=sautidarasa,SPEECH_LANGUAGE_CODE=en-KE,SPEECH_SAMPLE_RATE=16000,ALLOWED_ORIGINS=https://sauti-darasa-pwa-512236104756.africa-south1.run.app,http://localhost:5173"
+  --set-env-vars "GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,FIREBASE_DATABASE_URL=https://sautidarasa-default-rtdb.firebaseio.com,FIREBASE_PROJECT_ID=sautidarasa,SPEECH_LANGUAGE_CODE=en-KE,SPEECH_SAMPLE_RATE=16000,ALLOWED_ORIGINS=https://sauti-darasa-pwa-512236104756.africa-south1.run.app,http://localhost:5173"
 
 # Get service URL
 SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region $REGION --format 'value(status.url)')

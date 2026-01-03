@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio Capture Test</title>
+    <style>
+        body { font-family: Arial; padding: 40px; background: #0a0a0a; color: white; }
+        button { padding: 15px 30px; margin: 10px; font-size: 16px; cursor: pointer; }
+        #record { background: #3b82f6; color: white; border: none; border-radius: 8px; }
+        #stop { background: #ef4444; color: white; border: none; border-radius: 8px; }
+        #download { background: #10b981; color: white; border: none; border-radius: 8px; display: none; }
+        #status { margin: 20px 0; padding: 20px; background: #1a1a1a; border-radius: 8px; }
+        #info { color: #60a5fa; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>🎤 Audio Capture Test</h1>
+    
+    <div id="status">
+        <div id="info">Click "Start Recording" and speak for 5 seconds</div>
+        <div id="format" style="margin-top: 10px; color: #9ca3af;"></div>
+    </div>
+    
+    <button id="record">Start Recording</button>
+    <button id="stop" disabled>Stop Recording</button>
+    <button id="download">Download Audio File</button>
+    
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob;
+        
+        const recordBtn = document.getElementById('record');
+        const stopBtn = document.getElementById('stop');
+        const downloadBtn = document.getElementById('download');
+        const infoDiv = document.getElementById('info');
+        const formatDiv = document.getElementById('format');
+        
+        // Test MIME types
+        const mimeTypes = [
+            'audio/webm;codecs=opus',
+            'audio/ogg;codecs=opus',
+            'audio/webm',
+            'audio/ogg',
+            'audio/mp4'
+        ];
+        
+        let selectedMimeType = 'audio/webm';
+        for (const mime of mimeTypes) {
+            if (MediaRecorder.isTypeSupported(mime)) {
+                selectedMimeType = mime;
+                formatDiv.textContent = `Using MIME type: ${mime}`;
+                console.log(`Selected MIME type: ${mime}`);
+                break;
+            }
+        }
+        
+        recordBtn.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        channelCount: 1,
+                        sampleRate: 48000,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    }
+                });
+                
+                audioChunks = [];
+                
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: selectedMimeType
+                });
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                        console.log(`Chunk received: ${event.data.size} bytes`);
+                    }
+                };
+                
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: selectedMimeType });
+                    console.log(`Total audio size: ${audioBlob.size} bytes`);
+                    
+                    // Show first bytes as hex
+                    audioBlob.slice(0, 16).arrayBuffer().then(buffer => {
+                        const bytes = new Uint8Array(buffer);
+                        const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                        console.log(`Audio header (first 16 bytes): ${hex}`);
+                        formatDiv.textContent += `\nHeader: ${hex}`;
+                    });
+                    
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    downloadBtn.href = audioUrl;
+                    downloadBtn.download = 'test_recording.' + (selectedMimeType.includes('webm') ? 'webm' : 'ogg');
+                    downloadBtn.style.display = 'inline-block';
+                    
+                    infoDiv.textContent = `✅ Recording saved! Size: ${audioBlob.size} bytes. Click download button.`;
+                    
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                mediaRecorder.start();
+                recordBtn.disabled = true;
+                stopBtn.disabled = false;
+                infoDiv.textContent = '🔴 Recording... Speak now!';
+                
+            } catch (err) {
+                infoDiv.textContent = `❌ Error: ${err.message}`;
+                console.error('Error:', err);
+            }
+        });
+        
+        stopBtn.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                recordBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+        });
+        
+        // Make download button work
+        downloadBtn.addEventListener('click', function() {
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'test_recording.' + (selectedMimeType.includes('webm') ? 'webm' : 'ogg');
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>

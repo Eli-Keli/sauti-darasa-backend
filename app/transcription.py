@@ -15,6 +15,7 @@ async def transcribe_audio(
 ) -> str:
     """
     Transcribe base64-encoded audio using Google Cloud Speech-to-Text.
+    Uses multiple encoding attempts for better compatibility.
     
     Args:
         audio_base64: Base64-encoded audio data (without data: prefix)
@@ -30,34 +31,86 @@ async def transcribe_audio(
         
         logger.info(f"Audio chunk size: {len(audio_bytes)} bytes")
         
-        # Configure recognition request
+        # Log first few bytes to debug format
+        if len(audio_bytes) > 4:
+            header = audio_bytes[:4].hex()
+            logger.info(f"Audio header (first 4 bytes): {header}")
+        
+        # Try multiple encoding configurations
+        configs_to_try = [
+            {
+                "name": "OGG_OPUS (primary)",
+                "encoding": speech.RecognitionConfig.AudioEncoding.OGG_OPUS,
+                "sample_rate": None,  # Auto-detect
+            },
+            {
+                "name": "WEBM_OPUS (48kHz)",
+                "encoding": speech.RecognitionConfig.AudioEncoding.WEBM_OPUS,
+                "sample_rate": 48000,
+            },
+            {
+                "name": "WEBM_OPUS (auto-detect)",
+                "encoding": speech.RecognitionConfig.AudioEncoding.WEBM_OPUS,
+                "sample_rate": None,
+            },
+        ]
+        
         audio = speech.RecognitionAudio(content=audio_bytes)
-        config = speech.RecognitionConfig(
-            encoding=speech.RecognitionConfig.AudioEncoding.WEBM_OPUS,
-            sample_rate_hertz=sample_rate,
-            language_code=language_code,
-            enable_automatic_punctuation=True,
-            model="default",  # Options: 'default', 'video', 'phone_call', 'command_and_search'
-            use_enhanced=True  # Use enhanced model for better accuracy
-        )
+        last_error = None
         
-        # Perform synchronous recognition
-        response = speech_client.recognize(config=config, audio=audio)
+        for config_info in configs_to_try:
+            try:
+                logger.info(f"Trying {config_info['name']}...")
+                
+                config_params = {
+                    "encoding": config_info["encoding"],
+                    "language_code": language_code,
+                    "enable_automatic_punctuation": True,
+                    "model": "default",
+                }
+                
+                if config_info["sample_rate"] is not None:
+                    config_params["sample_rate_hertz"] = config_info["sample_rate"]
+                
+                config = speech.RecognitionConfig(**config_params)
+                
+                # Perform synchronous recognition
+                response = speech_client.recognize(config=config, audio=audio)
+                
+                # Log response details
+                logger.info(f"Speech API returned {len(response.results)} results with {config_info['name']}")
+                
+                # Extract transcript
+                transcripts = []
+                for i, result in enumerate(response.results):
+                    if result.alternatives:
+                        transcript_text = result.alternatives[0].transcript
+                        confidence = result.alternatives[0].confidence if hasattr(result.alternatives[0], 'confidence') else 'N/A'
+                        logger.info(f"  Result {i}: '{transcript_text}' (confidence: {confidence})")
+                        transcripts.append(transcript_text)
+                
+                transcript = " ".join(transcripts).strip()
+                
+                if transcript:
+                    logger.info(f"✅ Transcription successful with {config_info['name']}: {transcript}")
+                    return transcript
+                else:
+                    # No speech detected with this config, try next
+                    logger.warning(f"No speech detected with {config_info['name']}, trying next config...")
+                    continue
+                    
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Config {config_info['name']} failed: {str(e)}")
+                continue
         
-        # Extract transcript
-        transcripts = []
-        for result in response.results:
-            if result.alternatives:
-                transcripts.append(result.alternatives[0].transcript)
-        
-        transcript = " ".join(transcripts).strip()
-        
-        if transcript:
-            logger.info(f"Transcribed: {transcript}")
+        # All configs failed
+        if last_error:
+            logger.warning(f"All encoding configs failed. Last error: {str(last_error)}")
         else:
-            logger.debug("No speech detected in audio chunk")
+            logger.warning("⚠️ No speech detected in audio chunk - API returned empty results for all configs")
         
-        return transcript
+        return ""
         
     except base64.binascii.Error as e:
         logger.error(f"Base64 decode error: {str(e)}")

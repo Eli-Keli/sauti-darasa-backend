@@ -15,8 +15,8 @@ PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", settings.gcp_project_id)
 
 async def transcribe_audio(
     audio_base64: str,
-    language_code: str = "en-KE",
-    sample_rate: int = 48000  # Default to 48kHz (common for browsers)
+    language_code: str = "en-US",  # Changed from en-KE - V2 API has stricter language support
+    sample_rate: int = 48000
 ) -> str:
     """
     Transcribe base64-encoded audio using Google Cloud Speech-to-Text V2 API.
@@ -24,7 +24,7 @@ async def transcribe_audio(
     
     Args:
         audio_base64: Base64-encoded audio data (without data: prefix)
-        language_code: Language code (en-KE for Kenyan English)
+        language_code: Language code (en-US, en-GB supported by V2 API)
         sample_rate: Audio sample rate in Hz (default 48000)
     
     Returns:
@@ -42,11 +42,10 @@ async def transcribe_audio(
             logger.info(f"🔍 Audio header (first 8 bytes): {header}")
         
         # V2 API: Use AutoDetectDecodingConfig for automatic format detection
-        # This eliminates the need to guess encoding/sample rate!
         config = cloud_speech.RecognitionConfig(
             auto_decoding_config=cloud_speech.AutoDetectDecodingConfig(),
-            language_codes=[language_code],
-            model="short",  # "short" for < 1 min chunks, "long" for longer
+            language_codes=["en-US"],  # Use en-US for better V2 API compatibility
+            model="long",  # Changed to "long" - more flexible, works with short audio too
             features=cloud_speech.RecognitionFeatures(
                 enable_automatic_punctuation=True,
             ),
@@ -59,7 +58,7 @@ async def transcribe_audio(
             content=audio_bytes,
         )
         
-        logger.info(f"🎤 Sending to Speech-to-Text V2 API (auto-detect mode)...")
+        logger.info(f"🎤 Sending to Speech-to-Text V2 API (auto-detect, en-US, long model)...")
         
         # Transcribe the audio
         response = speech_client.recognize(request=request)

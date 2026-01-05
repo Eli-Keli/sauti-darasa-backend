@@ -18,12 +18,17 @@ class Settings(BaseSettings):
     
     # Speech-to-Text Settings
     SPEECH_LANGUAGE_CODE: str = "en-KE"
-    SPEECH_SAMPLE_RATE: int = 16000
+    SPEECH_SAMPLE_RATE: int = 48000  # Updated default to 48kHz (browser standard)
     
     @property
     def allowed_origins_list(self) -> List[str]:
         """Convert comma-separated ALLOWED_ORIGINS to list"""
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(',')]
+    
+    @property
+    def gcp_project_id(self) -> str:
+        """Lowercase accessor for GCP_PROJECT_ID"""
+        return self.GCP_PROJECT_ID
     
     class Config:
         env_file = ".env"

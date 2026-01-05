@@ -15,15 +15,15 @@ PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", settings.gcp_project_id)
 
 async def transcribe_audio(
     audio_base64: str,
-    language_code: str = "en-US",  # Changed from en-KE - V2 API has stricter language support
+    language_code: str = "en-US",
     sample_rate: int = 48000
 ) -> str:
     """
     Transcribe base64-encoded audio using Google Cloud Speech-to-Text V2 API.
-    Uses auto-detection for audio format - much more reliable!
+    Uses explicit LINEAR16 encoding for raw PCM audio from Web Audio API.
     
     Args:
-        audio_base64: Base64-encoded audio data (without data: prefix)
+        audio_base64: Base64-encoded LINEAR16 PCM audio data (16-bit, mono)
         language_code: Language code (en-US, en-GB supported by V2 API)
         sample_rate: Audio sample rate in Hz (default 48000)
     
@@ -41,11 +41,18 @@ async def transcribe_audio(
             header = audio_bytes[:8].hex()
             logger.info(f"🔍 Audio header (first 8 bytes): {header}")
         
-        # V2 API: Use AutoDetectDecodingConfig for automatic format detection
+        # V2 API: Use ExplicitDecodingConfig for LINEAR16 PCM audio
+        # This matches the raw PCM output from Web Audio API
+        explicit_config = cloud_speech.ExplicitDecodingConfig(
+            encoding=cloud_speech.ExplicitDecodingConfig.AudioEncoding.LINEAR16,
+            sample_rate_hertz=sample_rate,
+            audio_channel_count=1,  # Mono audio
+        )
+        
         config = cloud_speech.RecognitionConfig(
-            auto_decoding_config=cloud_speech.AutoDetectDecodingConfig(),
-            language_codes=["en-US"],  # Use en-US for better V2 API compatibility
-            model="long",  # Changed to "long" - more flexible, works with short audio too
+            explicit_decoding_config=explicit_config,
+            language_codes=[language_code],
+            model="long",  # Flexible model that works with various audio lengths
             features=cloud_speech.RecognitionFeatures(
                 enable_automatic_punctuation=True,
             ),
@@ -58,7 +65,7 @@ async def transcribe_audio(
             content=audio_bytes,
         )
         
-        logger.info(f"🎤 Sending to Speech-to-Text V2 API (auto-detect, en-US, long model)...")
+        logger.info(f"🎤 Sending to Speech-to-Text V2 API (LINEAR16, {sample_rate}Hz, {language_code}, long model)...")
         
         # Transcribe the audio
         response = speech_client.recognize(request=request)

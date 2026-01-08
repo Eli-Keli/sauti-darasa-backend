@@ -2,11 +2,17 @@
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
 
-# Google Cloud Speech-to-Text V2
+# Google Cloud Speech-to-Text V2 with gRPC
 google-cloud-speech==2.28.0
+grpcio==1.62.0
+grpcio-tools==1.62.0
 
 # Firebase Admin SDK
 firebase-admin==6.6.0
+google-cloud-firestore>=2.19.0
+
+# WebSocket support
+websockets==12.0
 
 # Configuration & Environment
 pydantic==2.10.5
